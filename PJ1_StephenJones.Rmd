@@ -1,0 +1,111 @@
+---
+title: "Project1_MSDS607"
+author: "Stephen Jones"
+date: "February 12, 2019"
+output:
+  html_document:
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Packages dplyr, stringr, data.table, and kableExtra are necessary to run the following code. Running will create a solution file entitled "ScoreSubset.csv" in the working directory. 
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(stringr)
+#load data text file with simple delimiter.
+player.data<-read.delim('C:/MSDS/tournamentinfo.txt',skip=1,sep="|",header=TRUE)
+#remove dashline and create a duplicate dataframe.
+avoid<-toString(player.data[2,1])
+players<-player.data %>% filter(Pair != avoid)
+titles_extrarow<-player.data %>% filter(Pair != avoid)
+#change column names of one dataframe.
+names(players)<-lapply(players[1,],as.character)
+#remove extra row..
+titles<-titles_extrarow[-1,]
+#delete alternate rows of each dataframe; odds in one, evens in the other.
+toDelete <- seq(1, nrow(players), 2)
+players2_extrarow<-players[toDelete,]
+#remove extra row.
+players2<-players2_extrarow[-1,]
+toDelete2 <- seq(1, nrow(players), 2)
+titles2<-titles[toDelete,]
+#remove unnecessary columns.
+titles2['X']<-NULL
+players2[11]<-NULL
+
+#merge altered data frames, check alignment.
+master<-as.data.frame(cbind(titles2[complete.cases(titles2),],players2[complete.cases(players2),]))
+colnames(master)<-str_trim(colnames(master))
+colnames(master)[12]<-"largestring"
+#extract USCF.ID and prerating.
+master$USCF.ID<-str_extract(master$largestring,"[0-9]{8}")
+master$PreRating<-as.numeric(as.character(str_trim(substr(master$largestring,15,19))))
+
+#extract OpponentIDs.
+master$OppID<-as.numeric(as.character(master$Pair))
+#create reference table for opponent preratings by ID.
+refscore<-master[c("OppID","PreRating")]
+master$Opponent1<-as.numeric(as.character(str_trim(str_extract(master$Round," [0-9]{1,2}"))))
+master$Opponent2<-as.numeric(as.character(str_trim(str_extract(master$Round.1," [0-9]{1,2}"))))
+master$Opponent3<-as.numeric(as.character(str_trim(str_extract(master$Round.2," [0-9]{1,2}"))))
+master$Opponent4<-as.numeric(as.character(str_trim(str_extract(master$Round.3," [0-9]{1,2}"))))
+master$Opponent5<-as.numeric(as.character(str_trim(str_extract(master$Round.4," [0-9]{1,2}"))))
+master$Opponent6<-as.numeric(as.character(str_trim(str_extract(master$Round.5," [0-9]{1,2}"))))
+master$Opponent7<-as.numeric(as.character(str_trim(str_extract(master$Round.6," [0-9]{1,2}"))))
+
+#merge repeatedly for each opponent prerating.
+colnames(refscore)[1]<-"Opponent1"
+colnames(refscore)[2]<-"OppScore1"
+master1<-merge(master,refscore,by="Opponent1")
+
+colnames(refscore)[1]<-"Opponent2"
+colnames(refscore)[2]<-"OppScore2"
+master1<-merge(master1,refscore,by="Opponent2")
+
+colnames(refscore)[1]<-"Opponent3"
+colnames(refscore)[2]<-"OppScore3"
+master1<-merge(master1,refscore,by="Opponent3")
+
+colnames(refscore)[1]<-"Opponent4"
+colnames(refscore)[2]<-"OppScore4"
+master1<-merge(master1,refscore,by="Opponent4")
+
+colnames(refscore)[1]<-"Opponent5"
+colnames(refscore)[2]<-"OppScore5"
+master1<-merge(master1,refscore,by="Opponent5")
+
+colnames(refscore)[1]<-"Opponent6"
+colnames(refscore)[2]<-"OppScore6"
+master1<-merge(master1,refscore,by="Opponent6")
+
+colnames(refscore)[1]<-"Opponent7"
+colnames(refscore)[2]<-"OppScore7"
+master1<-merge(master1,refscore,by="Opponent7")
+
+colnames(master1)[18]<-"State"
+
+#calculate means.
+master1$AveOppPreRating<-round(rowMeans(master1[,c("OppScore1","OppScore2","OppScore3","OppScore4","OppScore5","OppScore6","OppScore7")],na.rm=TRUE),digits=0)
+
+sort.master1<-master1[order(master1$OppID),]
+
+library(data.table)
+solution<-data.table(sort.master1[c("Player.Name","State","Total","PreRating","AveOppPreRating")])
+#alter column name.
+colnames(solution)[1]<-"PlayerName"
+
+library(kableExtra)
+anstable<-knitr::kable(solution,"html",align='lcccc')%>%
+  kable_styling("striped",
+                full_width = F)
+anstable
+
+#write .csv
+write.csv(solution,file="ScoreSubset.csv")
+
+```
